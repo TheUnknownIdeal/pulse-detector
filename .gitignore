@@ -1,0 +1,9 @@
+# Exclude data files
+*.csv
+
+# Python cache
+__pychache__/
+*.pyc
+
+#OS files
+.DS_Store
