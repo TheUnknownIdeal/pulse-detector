@@ -1,12 +1,9 @@
 #include "PulseSensor.h"
 #include <Wire.h>
 
-myMAX30102::myMAX30102(TwoWire* i2cport, uint8_t address) {
+myMAX30102::myMAX30102(TwoWire* i2cport, uint8_t address) : _ir{0}, _red{0} {
     _i2cPort = i2cport;  // The pointer starts pointing at "nothing"
     _address = address;     // The standard address for this chip
-
-    memset(_red,0,sizeof(_red));
-    memset(_ir,0,sizeof(_ir));
     _nsamples = 0;
 
 }

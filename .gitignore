@@ -10,3 +10,11 @@ __pychache__/
 
 # chatgbt example
 example.ino
+
+# Ignore all VC Code dummy files
+**/[Aa]rduino.h
+**/[Ww]ire.h
+
+# Ignore vscode things
+.vscode/
+
