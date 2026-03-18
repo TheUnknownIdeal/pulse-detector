@@ -1,0 +1,155 @@
+#include "max30102.h"
+#include <Wire.h>
+
+MAX30102::MAX30102(uint8_t* i2cport, uint8_t &address) {
+    _i2cPort = i2cport;  // The pointer starts pointing at "nothing"
+    _address = address;     // The standard address for this chip
+
+    memset(_red,0,sizeof(_red));
+    memset(_red,0,sizeof(_red));
+    _nsamples = 0;
+
+}
+
+void MAX30102::setupSensor() {
+
+    // Reset
+    writeRegister(_mode_config, 0x40);
+    delay(100);
+
+    // Clear FIFO pointers
+    writeRegister(_fifo_wr_ptr, 0x00);
+    writeRegister(_ovf_counter, 0x00);
+    writeRegister(_fifo_rd_ptr, 0x00);
+
+    // FIFO config:
+    // sample average = 1, FIFO rollover disabled, almost full = 0
+    writeRegister(_fifo_config, 0x0F);
+
+    // SpO2 mode = 0x03 (enables RED + IR)
+    writeRegister(_mode_config, 0x03);
+
+    // SPO2 config:
+    // ADC range = 4096 nA (01)
+    // sample rate = 100 Hz (001)
+    // pulse width = 411 us / 18-bit (11)
+    // binary: 01 001 11 = 0x27
+    writeRegister(_spo2_config, 0x27);
+
+    // LED pulse amplitudes
+    writeRegister(_led1_pa, 0x24); // RED current
+    writeRegister(_led2_pa, 0x24); // IR current
+
+    // Read interrupt status registers once to clear them
+    readRegister(_intr_status_1);
+    readRegister(_intr_status_2);
+
+}
+
+
+void MAX30102::writeRegister(uint8_t reg, uint8_t value) {
+    _i2cPort->beginTransmission(_address);
+    _i2cPort->write(reg);
+    _i2cPort->write(value);
+    _i2cPort->endTransmission();
+}
+
+uint8_t MAX30102::readRegister(uint8_t reg) {
+    _i2cPort->beginTransmission(_address);
+    _i2cPort->write(reg);
+    _i2cPort->endTransmission(false); // repeated start
+
+    _i2cPort->requestFrom(_address, 1);
+    if (_i2cPort->available()) {
+        return _i2cPort->read();
+    }
+    return 0;
+}
+
+void MAX30102::readFIFO(uint32_t &red, uint32_t &ir) {
+    _i2cPort->beginTransmission(_address);
+    _i2cPort->write(_fifo_data);
+    _i2cPort->endTransmission(false);
+
+    // In SpO2 mode, one sample = 3 bytes RED + 3 bytes IR
+    _i2cPort->requestFrom(_address, 6);
+
+    uint8_t redMSB = _i2cPort->read();
+    uint8_t redMid = _i2cPort->read();
+    uint8_t redLSB = _i2cPort->read();
+    uint8_t irMSB  = _i2cPort->read();
+    uint8_t irMid  = _i2cPort->read();
+    uint8_t irLSB  = _i2cPort->read();
+
+    red = ((uint32_t)redMSB << 16) | ((uint32_t)redMid << 8) | redLSB;
+    ir  = ((uint32_t)irMSB  << 16) | ((uint32_t)irMid  << 8) | irLSB;
+
+    // MAX30102 samples are 18-bit, so keep only lower 18 bits
+    red &= 0x3FFFF;
+    ir  &= 0x3FFFF;
+}
+
+void MAX30102::fullRead(uint32_t& redAvg, uint32_t& irAvg) {
+
+    // Load Fifo data into 
+    _fullFIFO();
+
+    uint64_t redSum = 0;
+    uint64_t irSum = 0;
+
+    for (int i=0; i < 32; i++) {
+        redSum += _red[i];
+        irSum += _ir[i];
+    }
+
+    red = (uint32_t) (redSum / _nsamples);
+    ir = (uint32_t) (irSum / _nsamples);
+}
+
+
+void MAX30102::_fullFIFO() {
+
+
+    // First clear memory
+    memset(_red,0,sizeof(_red));
+    memset(_ir,0,sizeof(_ir));
+
+    uint8_t front_ptr = readRegister(_fifo_wr_ptr);
+    uint8_t back_ptr = readRegister(_fifo_rd_ptr);
+
+    // Calculate how many samples are waiting
+    int numSamples = front_ptr - back_ptr;
+    if (numSamples < 0) numSamples += 32; // Handle wrap-around
+
+    // THE SAFETY GUARD
+    if (numSamples > 32) numSamples = 32;
+
+    _nsamples = (uint8_t)numSamples;
+
+    // Set up FIFO data register
+    _i2cPort->beginTransmission(_address);
+    _i2cPort->write(_fifo_data);
+    _i2cPort->endTransmission(false);
+
+    for (uint8_t i= 0; i < numSamples; i++) {
+
+        // request 6 bytes
+        _i2cPort->requestFrom(_address, (uint8_t)6);
+
+        uint8_t redMSB = _i2cPort->read();
+        uint8_t redMid = _i2cPort->read();
+        uint8_t redLSB = _i2cPort->read();
+        uint8_t irMSB  = _i2cPort->read();
+        uint8_t irMid  = _i2cPort->read();
+        uint8_t irLSB  = _i2cPort->read();
+
+        _red[i] = ((redMSB << 16) | (redMid << 8) | redLSB) & 0x3FFFF;
+        _ir[i]  = ((irMSB  << 16) | (irMid  << 8) | irLSB) & 0x3FFFF;
+
+    }
+
+    // reset the overflow counter
+    writeRegister(_ovf_counter, 0x00);
+    
+}
+

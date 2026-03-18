@@ -7,3 +7,6 @@ __pychache__/
 
 #OS files
 .DS_Store
+
+# chatgbt example
+example.ino
