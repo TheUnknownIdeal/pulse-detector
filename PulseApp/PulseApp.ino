@@ -1,15 +1,16 @@
 #include <Wire.h>
 
-#include "MAX30102.h"
+#include "PulseSensor.h"
 
 
 
 int yellowLED = 5; // The LED pin
 
 // Pass the address of the Wire object and the I2C address
-MAX30102 pulseSensor(&Wire, 0x57); 
+myMAX30102 pulseSensor(&Wire, 0x57); 
 
 uint32_t redAvg, irAvg; // Variables to hold our results
+uint8_t n; //variable holding the number of samples returned per call
 
 void setup() {
     pinMode(LED_BUILTIN, OUTPUT);
@@ -32,17 +33,19 @@ void setup() {
 
 void loop() {
     // This calls _fullFIFO() internally and calculates averages
-    pulseSensor.fullRead(redAvg, irAvg);
+    pulseSensor.fullRead(redAvg, irAvg, n);
 
     // Only print if we actually got samples
     if (redAvg > 0) {
         Serial.print("Red Avg: ");
         Serial.print(redAvg);
         Serial.print("\tIR Avg: ");
-        Serial.println(irAvg);
+        Serial.print(irAvg);
+        Serial.print("\tn: ");
+        Serial.println(n);
     }
 
     // Small delay so we don't spam the I2C bus too fast
     // The sensor is set to 100Hz, so 20-50ms is a good polling rate
-    delay(50); 
+    delay(10); 
 }

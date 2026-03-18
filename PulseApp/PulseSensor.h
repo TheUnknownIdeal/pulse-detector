@@ -1,29 +1,28 @@
-#ifndef MAX30102_H
-#define MAX30102_H
+#ifndef PULSE_SENSOR_H
+#define PULSE_SENSOR_H
 
 #include <Arduino.h> // Gives you access to byte, HIGH, LOW, etc.
 #include <Wire.h>
 
 
-class MAX30102 {
+class myMAX30102 {
     public:
 
-        MAX30102();
+        myMAX30102(TwoWire* i2cport, uint8_t address);
 
         void setupSensor();
 
-        void writeRegister();
-        uint8_t readRegister();
+        void writeRegister(uint8_t reg, uint8_t value);
+        uint8_t readRegister(uint8_t reg);
 
-        void fullRead();
+        void readFIFO(uint32_t &red, uint32_t &ir);
 
-
-
+        void fullRead(uint32_t& redAvg, uint32_t& irAvg, uint8_t&n);
 
     private:
 
         uint8_t _address; // Device addres
-        TwoWire* _ic2port; // The arduino I2C port
+        TwoWire* _i2cPort; // The arduino I2C port
 
         // FIFO Registers
         static const uint8_t _fifo_data = 0x07;
@@ -38,11 +37,10 @@ class MAX30102 {
 
         // config regitsters
         static const uint8_t _fifo_config = 0x08;
-        static const uint8_t _mode_config = 0x0;
+        static const uint8_t _mode_config = 0x09;
         static const uint8_t _spo2_config = 0x0A;
         static const uint8_t _led1_pa = 0x0C; // red LED current
         static const uint8_t _led2_pa = 0x0D; // ir LED current
-
 
 
         void _fullFIFO();
@@ -51,11 +49,6 @@ class MAX30102 {
 
         uint32_t _red[32];
         uint32_t _ir[32];
-
-
-
-
-        
 
 };
 

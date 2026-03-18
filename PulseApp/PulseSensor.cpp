@@ -1,17 +1,17 @@
-#include "max30102.h"
+#include "PulseSensor.h"
 #include <Wire.h>
 
-MAX30102::MAX30102(uint8_t* i2cport, uint8_t &address) {
+myMAX30102::myMAX30102(TwoWire* i2cport, uint8_t address) {
     _i2cPort = i2cport;  // The pointer starts pointing at "nothing"
     _address = address;     // The standard address for this chip
 
     memset(_red,0,sizeof(_red));
-    memset(_red,0,sizeof(_red));
+    memset(_ir,0,sizeof(_ir));
     _nsamples = 0;
 
 }
 
-void MAX30102::setupSensor() {
+void myMAX30102::setupSensor() {
 
     // Reset
     writeRegister(_mode_config, 0x40);
@@ -34,7 +34,8 @@ void MAX30102::setupSensor() {
     // sample rate = 100 Hz (001)
     // pulse width = 411 us / 18-bit (11)
     // binary: 01 001 11 = 0x27
-    writeRegister(_spo2_config, 0x27);
+
+    writeRegister(_spo2_config, 0b0101011);
 
     // LED pulse amplitudes
     writeRegister(_led1_pa, 0x24); // RED current
@@ -46,33 +47,32 @@ void MAX30102::setupSensor() {
 
 }
 
-
-void MAX30102::writeRegister(uint8_t reg, uint8_t value) {
+void myMAX30102::writeRegister(uint8_t reg, uint8_t value) {
     _i2cPort->beginTransmission(_address);
     _i2cPort->write(reg);
     _i2cPort->write(value);
     _i2cPort->endTransmission();
 }
 
-uint8_t MAX30102::readRegister(uint8_t reg) {
+uint8_t myMAX30102::readRegister(uint8_t reg) {
     _i2cPort->beginTransmission(_address);
     _i2cPort->write(reg);
     _i2cPort->endTransmission(false); // repeated start
 
-    _i2cPort->requestFrom(_address, 1);
+    _i2cPort->requestFrom(_address, (uint8_t)1);
     if (_i2cPort->available()) {
         return _i2cPort->read();
     }
     return 0;
 }
 
-void MAX30102::readFIFO(uint32_t &red, uint32_t &ir) {
+void myMAX30102::readFIFO(uint32_t &red, uint32_t &ir) {
     _i2cPort->beginTransmission(_address);
     _i2cPort->write(_fifo_data);
     _i2cPort->endTransmission(false);
 
     // In SpO2 mode, one sample = 3 bytes RED + 3 bytes IR
-    _i2cPort->requestFrom(_address, 6);
+    _i2cPort->requestFrom(_address, (uint8_t)6);
 
     uint8_t redMSB = _i2cPort->read();
     uint8_t redMid = _i2cPort->read();
@@ -89,7 +89,7 @@ void MAX30102::readFIFO(uint32_t &red, uint32_t &ir) {
     ir  &= 0x3FFFF;
 }
 
-void MAX30102::fullRead(uint32_t& redAvg, uint32_t& irAvg) {
+void myMAX30102::fullRead(uint32_t& redAvg, uint32_t& irAvg, uint8_t& n) {
 
     // Load Fifo data into 
     _fullFIFO();
@@ -97,17 +97,25 @@ void MAX30102::fullRead(uint32_t& redAvg, uint32_t& irAvg) {
     uint64_t redSum = 0;
     uint64_t irSum = 0;
 
-    for (int i=0; i < 32; i++) {
+    if (_nsamples == 0) {
+        redAvg = 0;
+        irAvg = 0;
+        n = 0;
+        return;
+    }
+
+    for (int i=0; i < _nsamples; i++) {
         redSum += _red[i];
         irSum += _ir[i];
     }
 
-    red = (uint32_t) (redSum / _nsamples);
-    ir = (uint32_t) (irSum / _nsamples);
+    redAvg = (uint32_t) (redSum / _nsamples);
+    irAvg = (uint32_t) (irSum / _nsamples);
+    n = _nsamples;
 }
 
 
-void MAX30102::_fullFIFO() {
+void myMAX30102::_fullFIFO() {
 
 
     // First clear memory
