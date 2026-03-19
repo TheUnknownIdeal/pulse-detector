@@ -9,32 +9,27 @@ class SignalStream {
         // main operation
         int64_t rolling(uint32_t& ir, uint32_t& red, uint16_t dp, bool& hb, int32_t& slope);
 
-        // Print for debugging
-        void print_stream();
 
         // Time stamp for previous heartbeat
 
         // Minimum samples between heartbeats
         static constexpr uint16_t  hb_delay = 20; // At 100 Hz, this is 200 ms
 
-        uint16_t period; // Period measured in samples
+        uint16_t t; // Period measured in samples
+
+        float spo2;
        
 
 
     private:
 
-        // Raw samples
-        static constexpr uint16_t _len = 20;
-        uint32_t _ir[_len];
-        uint32_t _red[_len];
-        
-        uint16_t _i; // index to iterrate through array
+        // Width of the AC bucket
+        static constexpr uint16_t _wAC = 20;
+        uint32_t _ir;
+        uint32_t _red;
 
         // Add raw sample
-        void _add_value(uint32_t& ir, uint32_t& red);
-
-        // compute averages from raw samples
-        void _getAvg(uint32_t& irAvg, uint32_t& redAvg, uint16_t dp);
+        void _updateP(uint32_t& ir, uint32_t& red);
 
 
         
@@ -46,19 +41,15 @@ class SignalStream {
         // Delta = current Average - past average
         int32_t _write_new_delta(int32_t new_val, bool& hb);
 
-        // Period data
-        static constexpr uint8_t _t = 4;
-        uint16_t _periods[_t];
-        uint32_t _running_period_sum;
-
         // _c1 is counting (in samples) the duration of the current period
-        uint16_t _c1; // a basic counter for computing periods
-
-        void _get_period();
+        static constexpr uint16_t _wt = 5; // How many ts the period bucket will store ("w" stands for width)
+        uint16_t _c1;
 
         // DC Buckets
         uint32_t _irDC;
         uint32_t _redDC;
+
+        void _spo2_compute();
 
         void _get_DC(uint32_t& ir, uint32_t& red);
 

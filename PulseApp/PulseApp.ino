@@ -92,7 +92,9 @@ void loop() {
         Serial.print(" delta:");
         Serial.print(current_slope);
         Serial.print(" t:");
-        Serial.print(sensor_data.period);
+        Serial.print(sensor_data.t);
+        Serial.print(" spo2:");
+        Serial.print(sensor_data.spo2);
         Serial.println();
     }
 
