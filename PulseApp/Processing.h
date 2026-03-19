@@ -4,56 +4,68 @@
 
 class SignalStream {
     public:
-        SignalStream(long& hbDelay);
+        SignalStream(); // Contructor
 
         // main operation
-        int64_t update(uint32_t& ir, uint32_t& red, uint16_t dp, bool& hb, long& current_time, int32_t& slope);
-
-        int64_t rolling(uint32_t& ir, uint32_t& red, uint16_t dp, bool& hb, long& current_time, int32_t& slope);
+        int64_t rolling(uint32_t& ir, uint32_t& red, uint16_t dp, bool& hb, int32_t& slope);
 
         // Print for debugging
         void print_stream();
 
         // Time stamp for previous heartbeat
-        long hb_stamp;
-        long hb_delay; // Minimum time between heartbeats
 
-        
+        // Minimum samples between heartbeats
+        static constexpr uint16_t  hb_delay = 20; // At 100 Hz, this is 200 ms
+
+        uint16_t period; // Period measured in samples
+       
 
 
     private:
 
-        // An ir value below this threshold is considered a bad sample (no finger)
-        static constexpr uint32_t _threshold = 50000;
+        // Raw samples
+        static constexpr uint16_t _len = 20;
+        uint32_t _ir[_len];
+        uint32_t _red[_len];
+        
+        uint16_t _i; // index to iterrate through array
 
+        // Add raw sample
+        void _add_value(uint32_t& ir, uint32_t& red);
 
-        // Number of samples held
-        static constexpr uint16_t _len = 150;
-
-
-        // Space between heartbeats
-        static constexpr uint16_t _n = 5;
-
-        // Registers for detecting heartbeat
-        uint32_t _hb[_n];
-        int32_t _last_slope;
-
-        int32_t _write_new_slope(int32_t new_val, bool& hb, long& timestamp);
-
-
-
+        // compute averages from raw samples
+        void _getAvg(uint32_t& irAvg, uint32_t& redAvg, uint16_t dp);
 
 
         
+        // Registers for detecting heartbeat
+        static constexpr uint16_t _w = 15; // The width of a delta (number of samples)
+        uint32_t _hb[_w]; // Processed IR samples
+        int32_t _last_delta; // The previous computed delta
 
-        uint32_t _ir[_len];
-        uint32_t _red[_len];
+        // Delta = current Average - past average
+        int32_t _write_new_delta(int32_t new_val, bool& hb);
 
-        // index to iterrate through array
-        uint16_t _i;
+        // Period data
+        static constexpr uint8_t _t = 4;
+        uint16_t _periods[_t];
+        uint32_t _running_period_sum;
 
-        void _add_value(uint32_t& ir, uint32_t& red);
-        void _getAvg(uint32_t& irAvg, uint32_t& redAvg, uint16_t dp);
+        // _c1 is counting (in samples) the duration of the current period
+        uint16_t _c1; // a basic counter for computing periods
+
+        void _get_period();
+
+        // DC Buckets
+        uint32_t _irDC;
+        uint32_t _redDC;
+
+        void _get_DC(uint32_t& ir, uint32_t& red);
+
+        
+
+
+
 
 
 

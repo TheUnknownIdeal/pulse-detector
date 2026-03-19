@@ -3,33 +3,59 @@
 #include "Processing.h"
 
 
-SignalStream::SignalStream() : _ir{0}, _red{0}, _hb{0}, _periods{0} {
+SignalStream::SignalStream(long& hbDelay) : _ir{0}, _red{0}, _hb{0} {
+
+    hb_delay = hbDelay;
 
     _i = 0;
-    _running_period_sum = 0;
-    period = 0;
-    _c1 = 0;
+}
 
-    _irDC = 0;
-    _redDC = 0;
+
+int64_t SignalStream::update(uint32_t& ir, uint32_t& red, uint16_t dp, bool& hb, long& current_time,int32_t& slope) {
+
+    _add_value(ir, red);
+
+    // Get global average (DC)
+    uint32_t irDC, redDC;
+    _getAvg(irDC, redDC, (uint16_t)_len);
+
+    // Get rolling average
+    uint32_t irRol, redRol;
+    _getAvg(irRol, redRol, dp);
+
+    
+    
+
+    // 1. Calculate the signed differences (AC components)
+    int32_t irDiff  = (int32_t)irRol - (int32_t)irDC;
+    int32_t redDiff = (int32_t)redRol - (int32_t)redDC;
+
+    // Calculate slope and heartbeat
+    slope = _write_new_slope(irDiff, hb, current_time);
+
+    // We cast redDiff to uint32_t to "neutralize" the sign bit before the OR
+    int64_t normalized_pair = ((int64_t)irDiff << 32) | (uint32_t)redDiff;
+
+    return normalized_pair;
+
     
 }
 
-int64_t SignalStream::rolling(uint32_t& ir, uint32_t& red, uint16_t dp, bool& hb, int32_t& slope) {
+int64_t SignalStream::rolling(uint32_t& ir, uint32_t& red, uint16_t dp, bool& hb, long& current_time, int32_t& slope) {
     /*
     "dp": means depth, "how many previous raw samples should be averaged to create new processed sample"
     "hb": boolean variable for if heartbeat is present. 0 - no, 1 - yes
     "current_time": A timestamp used to compare with time of previous heartbeat
     */
 
-    _add_value(ir, red); // Add raw sample
+    _add_value(ir, red);
 
-    // Get rolling averages
+    // Get rolling average
     uint32_t irRol, redRol;
-    _getAvg(irRol, redRol, dp); // process sample by taking an average
+    _getAvg(irRol, redRol, dp);
 
-    // Calculate Delta detect heartbeat
-    slope = _write_new_delta((int32_t)irRol, hb);
+    // Calculate slope and heartbeat
+    slope = _write_new_slope((int32_t)irRol, hb, current_time);
 
     // We cast redDiff to uint32_t to "neutralize" the sign bit before the OR
     int64_t processed_pair = ((int64_t)irRol << 32) | (uint32_t)redRol;
@@ -37,85 +63,44 @@ int64_t SignalStream::rolling(uint32_t& ir, uint32_t& red, uint16_t dp, bool& hb
     return processed_pair;    
 }
 
-// And Negative switching delta is used to detect heartbeats
-int32_t SignalStream::_write_new_delta(int32_t new_val, bool& hb) {
+int32_t SignalStream::_write_new_slope(int32_t new_val, bool& hb, long& timestamp) {
 
-    // Calculate new Delta
-    int32_t delta = (int32_t)new_val - (int32_t)_hb[_w - 1];
+    // Calculate new slope
+    int32_t slope = (int32_t)new_val - (int32_t)_hb[_n - 1];
 
     // Shift values in registers
     // 2. Shift the history buffer 
     // We move values 'right' to make room for the new one at [0]
-    for (uint16_t i = _w - 1; i > 0; i--) {
+    for (uint16_t i = _n - 1; i > 0; i--) {
         _hb[i] = _hb[i - 1];
     }
     _hb[0] = new_val; // Update the 'newest' slot
 
-    // _c1 is counting (in samples) the duration of the current period
-
     // Log heartbeat if peak is detected and hb_delay time has elapsed
-    if ( (delta < 0) && (_last_delta > 0) && (_c1 > hb_delay)) {
-        
+    if ( (slope < 0) && (_last_slope > 0) && (timestamp - hb_stamp > hb_delay)) {
         hb = true;
-        _get_period();
-        _c1 = 0; // reset period counter after it has been recorded
-
+        hb_stamp = timestamp;
     } else {
         hb = false;
-        _c1++; // Add to period counter
     }
-    _last_delta = delta;
+    _last_slope = slope;
 
-    return delta;
-}
-
-void SignalStream::_get_period() {
-
-    // Period length is period counter because the heartbeat has been determined
-    
-    // Kick out oldest period
-    _running_period_sum -= _periods[_t - 1];
-
-    // Add new period to runnign sum
-    _running_period_sum +=  _c1;
-    
-
-    // Shift new_period into _timestamps
-    for (uint8_t i = _t - 1; i > 0; i--) {
-        _periods[i] = _periods[i - 1]; // update register
-    }
-    _periods[0] = _c1;
-   
-    // Calculate new average period
-    period = _running_period_sum / _t;
-}
-
-void SignalStream::_get_DC(uint32_t& ir, uint32_t& red) {
-
-    //_c2 is another sample counter used for saving samples mid period
-
-    // Don't track until a period is established;
-    if (period == 0) return;
-
-    // LEaky Bucket FTW
-    _irDC += ir / (period + 1);
-    _redDC += red / (period + 1);
-
-    _irDC -= _irDC / (period + 1); // period +1 denominator keeps size of bucket at period
-    _redDC -= _redDC / (period + 1);
+    return slope;
 
 }
-
 
 void SignalStream::_getAvg(uint32_t& irAvg, uint32_t& redAvg, uint16_t dp)  {
+
     /*
     "dp": "depth" - How many samples we will take for the rolling average
         - Will be set to buffer size if a depth greater than buffer size is given
     */
+
     uint64_t redSum = 0;
     uint64_t irSum = 0;
 
     if (dp > _len) dp = _len;
+
 
     // 3. Sum only up to that limit
     for (uint16_t j = 0; j < dp; j++) {
@@ -130,15 +115,6 @@ void SignalStream::_getAvg(uint32_t& irAvg, uint32_t& redAvg, uint16_t dp)  {
     redAvg = (uint32_t)(redSum / dp);
     irAvg = (uint32_t)(irSum / dp);
 }
-
-
-// Add raw samples to object
-void SignalStream::_add_value(uint32_t& ir, uint32_t& red) {
-    _ir[_i] = ir;
-    _red[_i++] = red;
-    if (_i >= _len) _i = 0;
-}
-
 // print all data for testing
 /*
 
@@ -174,5 +150,16 @@ void SignalStream::print_stream() { // Arduino serial monitor version
         }
         Serial.println();
     }
+
+}
+
+
+
+void SignalStream::_add_value(uint32_t& ir, uint32_t& red) {
+
+    _ir[_i] = ir;
+    _red[_i++] = red;
+
+    if (_i >= _len) _i = 0;
 
 }

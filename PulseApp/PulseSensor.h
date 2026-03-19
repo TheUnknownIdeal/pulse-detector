@@ -19,6 +19,9 @@ class myMAX30102 {
 
         void fullRead(uint32_t& redAvg, uint32_t& irAvg, uint8_t&n);
 
+        // An ir value below this threshold is considered a bad sample (no finger)
+        static constexpr uint32_t threshold = 50000;
+
     private:
 
         uint8_t _address; // Device addres
