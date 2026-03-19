@@ -47,8 +47,11 @@ class myMAX30102 {
 
         uint8_t _nsamples;
 
-        uint32_t _red[32];
-        uint32_t _ir[32];
+        
+        static constexpr uint8_t _buffer_size = 1; // Use this to determine how many buffers you want
+
+        uint32_t _red[_buffer_size];
+        uint32_t _ir[_buffer_size];
 
 };
 

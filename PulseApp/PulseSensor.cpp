@@ -91,23 +91,26 @@ void myMAX30102::fullRead(uint32_t& redAvg, uint32_t& irAvg, uint8_t& n) {
     // Load Fifo data into 
     _fullFIFO();
 
-    uint64_t redSum = 0;
-    uint64_t irSum = 0;
-
-    if (_nsamples == 0) {
-        redAvg = 0;
-        irAvg = 0;
-        n = 0;
+    if (_nsamples == 0 || _buffer_size == 0) {
+        redAvg = 0; irAvg = 0; n = 0;
         return;
     }
 
-    for (int i=0; i < _nsamples; i++) {
+    // condition ? va1 if condition true : val if condition is false
+    uint8_t limit = (_nsamples < _buffer_size) ? _nsamples : _buffer_size;
+
+    uint64_t redSum = 0;
+    uint64_t irSum = 0;
+
+    // 3. Sum only up to that limit
+    for (uint8_t i = 0; i < limit; i++) {
         redSum += _red[i];
         irSum += _ir[i];
     }
 
-    redAvg = (uint32_t) (redSum / _nsamples);
-    irAvg = (uint32_t) (irSum / _nsamples);
+    // 4. Calculate final values
+    redAvg = (uint32_t)(redSum / limit);
+    irAvg = (uint32_t)(irSum / limit);
     n = _nsamples;
 }
 
@@ -126,8 +129,6 @@ void myMAX30102::_fullFIFO() {
     int numSamples = front_ptr - back_ptr;
     if (numSamples < 0) numSamples += 32; // Handle wrap-around
 
-    // THE SAFETY GUARD
-    if (numSamples > 32) numSamples = 32;
 
     _nsamples = (uint8_t)numSamples;
 
@@ -148,8 +149,12 @@ void myMAX30102::_fullFIFO() {
         uint8_t irMid  = _i2cPort->read();
         uint8_t irLSB  = _i2cPort->read();
 
-        _red[i] = ((redMSB << 16) | (redMid << 8) | redLSB) & 0x3FFFF;
-        _ir[i]  = ((irMSB  << 16) | (irMid  << 8) | irLSB) & 0x3FFFF;
+        if (i < _buffer_size)   {
+            _red[i] = ((redMSB << 16) | (redMid << 8) | redLSB) & 0x3FFFF;
+            _ir[i]  = ((irMSB  << 16) | (irMid  << 8) | irLSB) & 0x3FFFF;
+        }
+
+        
 
     }
 
