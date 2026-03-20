@@ -1,18 +1,24 @@
 #include <Wire.h>
+#include <LiquidCrystal.h> 
 
 #include "PulseSensor.h"
 #include "Processing.h"
 
+// initialize the library by associating any needed LCD interface pin
+// with the arduino pin number it is connected to
+const int rs = 12, en = 11, d4 = 5, d5 = 4, d6 = 3, d7 = 2;
+LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 
 
-int finger_led = 5; // This is the pi that shows the light
+
+int finger_led = 7; // This is the pi that shows the light
 int beat_led = 6; // This LED represents your heartbeat
 
 // Pass the address of the Wire object and the I2C address
 myMAX30102 pulseSensor(&Wire, 0x57); 
 
 uint32_t hb_tsp = 0;
-uint32_t hb_diode_dur = 20000;
+uint32_t hb_diode_dur = 30000;
 
 uint32_t last_sample_us = 0;
 const uint32_t sample_interval_us = 10000; // 10,000 us = 10ms (100Hz)
@@ -30,17 +36,28 @@ void setup() {
     pinMode(finger_led, OUTPUT);
 
     Serial.begin(115200);
-    while (!Serial); // Wait for Serial Monitor (optional, good for Leonardo/ESP32)
-
-    Serial.begin(115200);
-    while (!Serial); // Wait for Serial Monitor (optional, good for Leonardo/ESP32)
+    delay(1000);
 
     Wire.begin();
-    Serial.begin(115200);
+    Serial.println("Starting Scan...");
+
+    // Check if the sensor is even responding to a ping
+    Wire.beginTransmission(0x57);
+    if (Wire.endTransmission() == 0) {
+        Serial.println("Sensor Detected at 0x57!");
+    } else {
+        Serial.println("Sensor NOT found on I2C bus.");
+    }
+
 
     Serial.println("Configuring MAX30102...");
-
     pulseSensor.setupSensor(); // set up max30102 driver
+    Serial.println("Configuration Successful!");
+
+    // set up the LCD's number of columns and rows:
+    lcd.begin(16, 2);
+
+    lcd.print("Config done.");
 
     
 }
@@ -93,10 +110,22 @@ void loop() {
             float SpO2;
             sensor_data.getSpO2(SpO2);
 
+            float BPM = 6000.0 / t;
+
 
             if (hb) {
                 digitalWrite(beat_led, HIGH);
                 hb_tsp = current_ms; // record hearbeat time
+
+                lcd.setCursor(0, 0);
+                lcd.print("BPM: ");
+                lcd.print(BPM,1 );
+                lcd.print("   ");
+
+                lcd.setCursor(0, 1);
+                lcd.print("SpO2: ");
+                lcd.print(SpO2,1 );
+                lcd.print("%  ");
 
             }
             
@@ -106,17 +135,17 @@ void loop() {
             Serial.print(" IR_DC:");
             Serial.print(IR_DC);
 
-            /*Serial.print(" RED:");
-            Serial.print(redAvg);
+            Serial.print(" RED:");
+            Serial.print(nRED);
             Serial.print(" RED_DC:");
             Serial.print(RED_DC);
-            Serial.println();*/
+            Serial.println();
             
-            Serial.print(" BPM:");
+            /*Serial.print(" BPM:");
             Serial.print(6000.0 / t);
             Serial.print(" SpO2:");
             Serial.print(SpO2);
-            Serial.println();
+            Serial.println();*/
             
             
 

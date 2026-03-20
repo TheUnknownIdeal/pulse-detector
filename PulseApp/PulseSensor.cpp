@@ -35,7 +35,8 @@ void myMAX30102::setupSensor() {
     writeRegister(_spo2_config, 0b0101011);
 
     // LED pulse amplitudes
-    writeRegister(_led1_pa, 0x24); // RED current
+    //writeRegister(_led1_pa, 0x24); // RED current
+    writeRegister(_led1_pa, 0b00101000); // RED current
     writeRegister(_led2_pa, 0x24); // IR current
 
     // Read interrupt status registers once to clear them

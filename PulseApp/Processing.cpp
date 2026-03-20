@@ -161,4 +161,5 @@ void SignalStream::getT(uint16_t& t) {
 
 void SignalStream::getSpO2(float& SpO2) {
     SpO2 = _bSpO2 / _wSpO2;
+    SpO2 /= 100;
 }
