@@ -7,7 +7,7 @@ class SignalStream {
         SignalStream(); // Contructor
 
         // main operation
-        int64_t rolling(uint32_t& ir, uint32_t& red, uint16_t dp, bool& hb, int32_t& slope);
+        uint64_t update(uint32_t& ir, uint32_t& red, bool& hb, int32_t& slope);
 
 
         // Time stamp for previous heartbeat
@@ -15,24 +15,34 @@ class SignalStream {
         // Minimum samples between heartbeats
         static constexpr uint16_t  hb_delay = 20; // At 100 Hz, this is 200 ms
 
-        uint16_t t; // Period measured in samples
 
-        float spo2;
+        void getP(uint32_t& ir,uint32_t& red);
+        void getDC(uint32_t& ir,uint32_t& red);
+
+        void getT(uint16_t& t);
+
+        void getSpO2(float& SpO2);
        
 
 
     private:
 
-        // Width of the AC bucket
+        // Buckets for IR and RED values
+        uint32_t _bIR;
+        uint32_t _bRED;
         static constexpr uint16_t _wAC = 20;
-        uint32_t _ir;
-        uint32_t _red;
 
-        // Add raw sample
-        void _updateP(uint32_t& ir, uint32_t& red);
+        // DC Buckets
+        uint32_t _bIR_DC; // They have a width of t (period)
+        uint32_t _bRED_DC;
+        static constexpr uint16_t _wDC = 200;
 
 
+        uint32_t _bt; // Period bucket
+        static constexpr uint16_t _wt = 5; // How many ts the period bucket will store ("w" stands for width)
+        uint16_t _ct; // counter for counting period (in samples)
         
+
         // Registers for detecting heartbeat
         static constexpr uint16_t _w = 15; // The width of a delta (number of samples)
         uint32_t _hb[_w]; // Processed IR samples
@@ -41,25 +51,14 @@ class SignalStream {
         // Delta = current Average - past average
         int32_t _write_new_delta(int32_t new_val, bool& hb);
 
-        // _c1 is counting (in samples) the duration of the current period
-        static constexpr uint16_t _wt = 5; // How many ts the period bucket will store ("w" stands for width)
-        uint16_t _c1;
+        long _bSpO2;
+        static constexpr uint16_t _wSpO2 = 3;
 
-        // DC Buckets
-        uint32_t _irDC;
-        uint32_t _redDC;
-
-        void _spo2_compute();
-
-        void _get_DC(uint32_t& ir, uint32_t& red);
-
+        void _update_SpO2();
         
-
-
-
-
-
-
+        // min and max values for calculating amplitudes for SpO2
+        uint32_t _minIR, _maxIR;
+        uint32_t _minRED, _maxRED;
 
 };
 
