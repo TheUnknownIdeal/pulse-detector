@@ -5,11 +5,21 @@ The Arduino streams the infrared (IR) signal over serial, and a Python script lo
 
 The goal of the project is to experiment with **heartbeat detection algorithms** using the raw IR time series from the sensor.
 
+![Circuit Setup](images/device.jpg)
+
 ## Hardware
 
 * Arduino Uno
 * GY-MAX30102 pulse sensor
 * USB connection to computer
+* 500 ohm resistors 2pcs
+* LED 2 pcs
+* LCD 1602 
+* 220 ohm resistor
+* 10k ohm potentiometer
+* hook-up wires
+* breadboard
+
 
 ### Wiring
 
