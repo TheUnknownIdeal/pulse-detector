@@ -49,7 +49,7 @@ class SignalStream {
         int32_t _last_delta; // The previous computed delta
 
         // Delta = current Average - past average
-        int32_t _write_new_delta(int32_t new_val, bool& hb);
+        int32_t _detect_HB(int32_t new_val, bool& hb);
 
         long _bSpO2;
         static constexpr uint16_t _wSpO2 = 3;
