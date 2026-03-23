@@ -19,6 +19,8 @@ class myMAX30102 {
 
         void fullRead(uint32_t& redAvg, uint32_t& irAvg, uint8_t&n);
 
+        void readTemp(float& temp);
+
         // An ir value below this threshold is considered a bad sample (no finger)
         static constexpr uint32_t threshold = 50000;
 
@@ -38,12 +40,17 @@ class myMAX30102 {
         static const uint8_t _intr_status_1 = 0x00;
         static const uint8_t _intr_status_2 = 0x01;
 
-        // config regitsters
+        // config registers
         static const uint8_t _fifo_config = 0x08;
         static const uint8_t _mode_config = 0x09;
         static const uint8_t _spo2_config = 0x0A;
         static const uint8_t _led1_pa = 0x0C; // red LED current
         static const uint8_t _led2_pa = 0x0D; // ir LED current
+
+        // registers for temperature
+        static const uint8_t _temp_int = 0x1F; // integer part of temperature reading
+        static const uint8_t _temp_frac = 0x20; // fraction part
+        static const uint8_t _temp_config = 0x21;
 
 
         void _fullFIFO();

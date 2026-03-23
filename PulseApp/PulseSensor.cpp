@@ -35,8 +35,8 @@ void myMAX30102::setupSensor() {
     writeRegister(_spo2_config, 0b0101011);
 
     // LED pulse amplitudes
-    writeRegister(_led1_pa, 0x24); // RED current
-    //writeRegister(_led1_pa, 0b00101000); // RED current
+    //writeRegister(_led1_pa, 0x24); // RED current
+    writeRegister(_led1_pa, 0b00101000); // RED current
     writeRegister(_led2_pa, 0x24); // IR current
 
     // Read interrupt status registers once to clear them
@@ -154,13 +154,18 @@ void myMAX30102::_fullFIFO() {
             _red[i] = ((redMSB << 16) | (redMid << 8) | redLSB) & 0x3FFFF;
             _ir[i]  = ((irMSB  << 16) | (irMid  << 8) | irLSB) & 0x3FFFF;
         }
-
-        
-
     }
-
     // reset the overflow counter
     writeRegister(_ovf_counter, 0x00);
-    
 }
 
+void myMAX30102::readTemp(float& temp) {
+    
+    writeRegister(_temp_config,0b00000001); // Command sensor to read temperature;
+
+    int8_t integer = (int8_t)readRegister(_temp_int); // Load temp
+    uint8_t fraction = readRegister(_temp_frac);
+
+    //total temp = 
+
+}
