@@ -133,7 +133,7 @@ void loop() {
             Serial.print("IR:");
             Serial.print(nIR);
             Serial.print(" IR_DC:");
-            Serial.print(IR_DC);
+            Serial.print(current_slope);
 
             Serial.print(" RED:");
             Serial.print(nRED);
