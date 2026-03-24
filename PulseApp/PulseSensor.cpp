@@ -26,6 +26,11 @@ void myMAX30102::setupSensor() {
     // SpO2 mode = 0x03 (enables RED + IR)
     writeRegister(_mode_config, 0x03);
 
+    writeRegister(_intr_status_2, 0x02); // enable die temp interrupt
+    writeRegister(_intr_status_1, 0x00); // disable all other interrupts
+
+
+
     // SPO2 config:
     // ADC range = 4096 nA (01)
     // sample rate = 100 Hz (001)
@@ -159,13 +164,27 @@ void myMAX30102::_fullFIFO() {
     writeRegister(_ovf_counter, 0x00);
 }
 
-void myMAX30102::readTemp(float& temp) {
+
+// The command requests a die temperature reading from MAX30102
+// After some time, the temp will show up in registers "_temp_int" and "_temp_frac"
+// The temperature can be gotten with the "getTemp" function.
+void myMAX30102::orderTemp() {
+    writeRegister(_temp_config,0x01);
+}
+
+
+// Before reading temp "writeRegister(_temp_config,0x01);", must be done
+// Do this funct during the interrupt
+void myMAX30102::getTemp(int16_t& tempInSixteenths) {
+
+    // Acknowledge interrupt by reading interrupt status:
+    uint8_t status = readRegister(_intr_status_2);
     
-    writeRegister(_temp_config,0b00000001); // Command sensor to read temperature;
+     // Command sensor to read temperature;
+    int8_t temp_int = readRegister(0x1F);   // int is 8 bits
+    uint8_t temp_frac = readRegister(0x20); // frac is only 4 bits
 
-    int8_t integer = (int8_t)readRegister(_temp_int); // Load temp
-    uint8_t fraction = readRegister(_temp_frac);
+    tempInSixteenths = ((int16_t)temp_int << 4) | (temp_frac & 0x0F); // the byte mask prevents the fraction from being negative
 
-    //total temp = 
-
+    return;
 }

@@ -19,7 +19,9 @@ class myMAX30102 {
 
         void fullRead(uint32_t& redAvg, uint32_t& irAvg, uint8_t&n);
 
-        void readTemp(float& temp);
+        void getTemp(int16_t& tempInSixteenths);
+
+        void orderTemp();
 
         // An ir value below this threshold is considered a bad sample (no finger)
         static constexpr uint32_t threshold = 50000;
@@ -38,7 +40,11 @@ class myMAX30102 {
 
         // Interrupt registers
         static const uint8_t _intr_status_1 = 0x00;
-        static const uint8_t _intr_status_2 = 0x01;
+        static const uint8_t _intr_status_2 = 0x01; // contains interrupt flag for complete die temp reading
+        
+        static const uint8_t _intr_status_1_enable = 0x02; // disable all interrupts
+        static const uint8_t _intr_status_2_enable = 0x03; // enable die temp interrupt
+
 
         // config registers
         static const uint8_t _fifo_config = 0x08;

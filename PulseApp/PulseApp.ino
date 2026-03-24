@@ -4,36 +4,53 @@
 #include "PulseSensor.h"
 #include "Processing.h"
 
+
+// LCD PIN numbers defined here
+const int rs = 12, en = 11, d4 = 8, d5 = 7, d6 = 6, d7 = 5;
+
 // initialize the library by associating any needed LCD interface pin
-// with the arduino pin number it is connected to
-const int rs = 12, en = 11, d4 = 5, d5 = 4, d6 = 3, d7 = 2;
 LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 
 
+// Defining the LED pin numbers
+int finger_led = 10; // This is the pi that shows the light
 
-int finger_led = 7; // This is the pi that shows the light
-int beat_led = 6; // This LED represents your heartbeat
-
-// Pass the address of the Wire object and the I2C address
-myMAX30102 pulseSensor(&Wire, 0x57); 
-
-uint32_t hb_tsp = 0;
-uint32_t hb_diode_dur = 30000;
-
-uint32_t last_sample_us = 0;
-const uint32_t sample_interval_us = 10000; // 10,000 us = 10ms (100Hz)
+int beat_led = 9; // This LED represents your heartbeat
+uint32_t hb_diode_dur = 30000; // Blink duration of pulse detecting diode
+uint32_t hb_tsp = 0; // timestamp of last detected hearbeat (used for timing the shutdown of beat_led)
 
 
-// "sensor_data" houses and processes data
-SignalStream sensor_data;
 
-uint32_t redAvg, irAvg; // Variables to hold our results
-uint8_t n; //variable holding the number of samples returned per call
+// The object that controls MAX30102
+myMAX30102 pulseSensor(&Wire, 0x57); // Pass the address of the Wire object and the I2C address
+
+// INT pin on MAX30102
+#define SENSOR_INTERRUPT 3
+
+volatile byte interrupt_pin = HIGH;
+
+uint32_t last_temp_sample_us = 0;
+const uint32_t temp_sample_interval_us = 1000000; // every second
+
+
+
+// constants used for timing MAX30102 sampling
+uint32_t last_sample_us = 0; // <- Records time of previous sample ("us" microseconds)
+const uint32_t sample_interval_us = 10000; // 10,000 us = 10ms (100Hz) <- SAMPLING RATE
+
+
+
+
+// The object for processing data
+SignalStream sensor_data; 
+
+
 
 void setup() {
     // Set up LEDs
-    pinMode(beat_led, OUTPUT); // This is the Heartbit LED pin
-    pinMode(finger_led, OUTPUT);
+    pinMode(beat_led, OUTPUT); // Blinks when pulse is detected
+    pinMode(finger_led, OUTPUT); // Blinks when valid IR data is returned from MAX30102 (i.e. a finger is detected)
+    pinMode(finger_led, OUTPUT); // Blinks when valid IR data is returned from MAX30102 (i.e. a finger is detected)
 
     Serial.begin(115200);
     delay(1000);
@@ -54,6 +71,8 @@ void setup() {
     pulseSensor.setupSensor(); // set up max30102 driver
     Serial.println("Configuration Successful!");
 
+    attachInterrupt(digitalPinToInterrupt(SENSOR_INTERRUPT), loadTemp, FALLING);
+
     // set up the LCD's number of columns and rows:
     lcd.begin(16, 2);
 
@@ -72,11 +91,21 @@ void loop() {
         digitalWrite(beat_led, LOW);
     }
 
-    // Check if it is the corect sampling time
+    // Check if it is temperature sampling time
+    if (current_ms - last_temp_sample_us >= temp_sample_interval_us) {
+        last_temp_sample_us = current_ms;
+        pulseSensor.orderTemp();
+        Serial.println("temperature ordered");
+    }
+
+    // Check if it is IR and RED sampling time
     if (current_ms - last_sample_us >= sample_interval_us) {
         // This calls _fullFIFO() internally and calculates averages
 
         last_sample_us = current_ms;
+
+        uint32_t redAvg, irAvg; // Variables IR and RED samples 
+        uint8_t n; //variable holding the number of samples returned per call
 
         pulseSensor.fullRead(redAvg, irAvg, n);
 
@@ -91,8 +120,7 @@ void loop() {
             // Only execute analysis if finger is on sensor
             digitalWrite(finger_led, HIGH);
 
-            bool hb = false;
-
+            bool hb = false; // flag that tells whether pulse was detected
             int32_t current_slope;
 
             uint64_t nIR_nRED = sensor_data.update(irAvg, redAvg, hb, current_slope);
@@ -116,20 +144,29 @@ void loop() {
             if (hb) {
                 digitalWrite(beat_led, HIGH);
                 hb_tsp = current_ms; // record hearbeat time
+                
+                int16_t wholeDegree, milliDegrees;
 
+                temp_int_to_float(sensor_data.temp, wholeDegree, milliDegrees);
+
+                float tempurature = (float)wholeDegree + (float)milliDegrees / 1000.0;
+
+            
+                
                 lcd.setCursor(0, 0);
                 lcd.print("BPM: ");
                 lcd.print(BPM,1 );
                 lcd.print("   ");
 
                 lcd.setCursor(0, 1);
-                lcd.print("SpO2: ");
-                lcd.print(SpO2,1 );
-                lcd.print("%  ");
+                lcd.print("Temp: ");
+                lcd.print(tempurature, 1);
+                lcd.print(" C  ");
+                
 
             }
             
-
+            /*
             Serial.print("IR:");
             Serial.print(nIR);
             Serial.print(" IR_DC:");
@@ -141,7 +178,7 @@ void loop() {
             Serial.print(RED_DC);
             Serial.println();
             
-            /*Serial.print(" BPM:");
+            Serial.print(" BPM:");
             Serial.print(6000.0 / t);
             Serial.print(" SpO2:");
             Serial.print(SpO2);
@@ -151,4 +188,14 @@ void loop() {
 
         }
     }
+}
+
+// INterrupt function
+void loadTemp() {
+    // Load new temp into "sensor_data"
+    int16_t localTemp;
+    pulseSensor.getTemp(localTemp);
+    sensor_data.temp = localTemp;
+    //Serial.println(localTemp);
+    
 }

@@ -20,10 +20,12 @@ class SignalStream {
         void getDC(uint32_t& ir,uint32_t& red);
 
         void getT(uint16_t& t);
+        
+        // "volatile" is needed to tell the processor that this changes during interrupt
+        volatile uint16_t temp;
 
         void getSpO2(float& SpO2);
        
-
 
     private:
 
@@ -61,5 +63,8 @@ class SignalStream {
         uint32_t _minRED, _maxRED;
 
 };
+
+// A function that converts a int16_t reading, where the last bit is a 16th of a degree into a readable float 
+void temp_int_to_float(int16_t tempInSixteenths, int16_t& wholeDegree, int16_t& milliDegrees);
 
 #endif

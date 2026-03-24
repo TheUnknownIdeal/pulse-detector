@@ -16,6 +16,7 @@ The goal of the project is to experiment with **heartbeat detection algorithms**
 * LED 2 pcs
 * LCD 1602 
 * 220 ohm resistor
+* 10k ohm resistor
 * 10k ohm potentiometer
 * hook-up wires
 * breadboard
