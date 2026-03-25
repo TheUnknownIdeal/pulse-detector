@@ -5,7 +5,7 @@
 
 SignalStream::SignalStream() : _hb{0} {
 
-    temp = (0x19 << 4); // 25 but shifted 4 places.
+    temp = 400; // 25 but shifted 4 places.
 
     _bt = 0;
     _ct = 0;
@@ -128,14 +128,21 @@ void SignalStream::_update_SpO2() {
     // Apply the empirical linear approximation
     // SpO2 = A - B*R
     // A = 110 or 104, B = 25 or 17
-    float current_spo2 = 110.0 - (25.0 * R);
+    //float current_spo2 = 110.0 - (25.0 * R);
+    float current_spo2 = 104.0 - (17.0 * R);
+
+    
+
+
+
 
     // Bound the result between 50 % and 100%
     if (current_spo2 > 100.0) current_spo2 = 100.0;
     if (current_spo2 < 50.0)  current_spo2 = 50.0;
 
     // 5. Save to your uint16_t (Fixed Point)
-    float spo2 = (uint16_t)(current_spo2 * 100); 
+    //float spo2 = (uint16_t)(current_spo2 * 100); 
+    uint16_t spo2 = (uint16_t)(current_spo2 * 100); 
 
     // Add to bucket
     _bSpO2 += spo2;
@@ -161,8 +168,19 @@ void SignalStream::getT(uint16_t& t) {
 }
 
 void SignalStream::getSpO2(float& SpO2) {
+
+    // Get Raw reading from bin
     SpO2 = _bSpO2 / _wSpO2;
     SpO2 /= 100;
+
+    // compute temperature offset from (25 C)
+    int16_t tempOffset = temp - 400; //subtract 25 C (400 in sixteenths) to get offset
+
+    // Shift by 0.12 for each degree (16 units)
+    float tempCorrection = (tempOffset / 16.0)* 0.12;
+
+    SpO2 += tempCorrection;
+    
 }
 
 void temp_int_to_float(int16_t tempInSixteenths, int16_t& wholeDegrees, int16_t& milliDegrees) {

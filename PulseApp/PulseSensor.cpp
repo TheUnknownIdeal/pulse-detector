@@ -26,8 +26,8 @@ void myMAX30102::setupSensor() {
     // SpO2 mode = 0x03 (enables RED + IR)
     writeRegister(_mode_config, 0x03);
 
-    writeRegister(_intr_status_2, 0x02); // enable die temp interrupt
-    writeRegister(_intr_status_1, 0x00); // disable all other interrupts
+    writeRegister(_intr_status_2_enable, 0x02); // enable die temp interrupt
+    writeRegister(_intr_status_1_enable, 0x00); // disable all other interrupts
 
 
 
@@ -38,10 +38,11 @@ void myMAX30102::setupSensor() {
     // binary: 01 001 11 = 0x27
 
     writeRegister(_spo2_config, 0b0101011);
+    //writeRegister(_spo2_config, 0b1101011);
 
     // LED pulse amplitudes
-    //writeRegister(_led1_pa, 0x24); // RED current
-    writeRegister(_led1_pa, 0b00101000); // RED current
+    writeRegister(_led1_pa, 0x24); // RED current
+    //writeRegister(_led1_pa, 0b00101000); // RED current
     writeRegister(_led2_pa, 0x24); // IR current
 
     // Read interrupt status registers once to clear them
@@ -172,7 +173,6 @@ void myMAX30102::orderTemp() {
     writeRegister(_temp_config,0x01);
 }
 
-
 // Before reading temp "writeRegister(_temp_config,0x01);", must be done
 // Do this funct during the interrupt
 void myMAX30102::getTemp(int16_t& tempInSixteenths) {
@@ -185,6 +185,4 @@ void myMAX30102::getTemp(int16_t& tempInSixteenths) {
     uint8_t temp_frac = readRegister(0x20); // frac is only 4 bits
 
     tempInSixteenths = ((int16_t)temp_int << 4) | (temp_frac & 0x0F); // the byte mask prevents the fraction from being negative
-
-    return;
 }

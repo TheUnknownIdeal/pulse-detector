@@ -20,6 +20,11 @@ uint32_t hb_diode_dur = 30000; // Blink duration of pulse detecting diode
 uint32_t hb_tsp = 0; // timestamp of last detected hearbeat (used for timing the shutdown of beat_led)
 
 
+// LED state for debugging. Use "LED_BUILTIN"
+volatile bool ledstate = false;
+
+
+
 
 // The object that controls MAX30102
 myMAX30102 pulseSensor(&Wire, 0x57); // Pass the address of the Wire object and the I2C address
@@ -28,6 +33,7 @@ myMAX30102 pulseSensor(&Wire, 0x57); // Pass the address of the Wire object and 
 #define SENSOR_INTERRUPT 3
 
 volatile byte interrupt_pin = HIGH;
+volatile bool temp_flag = false;
 
 uint32_t last_temp_sample_us = 0;
 const uint32_t temp_sample_interval_us = 1000000; // every second
@@ -39,18 +45,18 @@ uint32_t last_sample_us = 0; // <- Records time of previous sample ("us" microse
 const uint32_t sample_interval_us = 10000; // 10,000 us = 10ms (100Hz) <- SAMPLING RATE
 
 
-
-
 // The object for processing data
 SignalStream sensor_data; 
 
 
-
 void setup() {
-    // Set up LEDs
+    // Set up LED pins
     pinMode(beat_led, OUTPUT); // Blinks when pulse is detected
     pinMode(finger_led, OUTPUT); // Blinks when valid IR data is returned from MAX30102 (i.e. a finger is detected)
-    pinMode(finger_led, OUTPUT); // Blinks when valid IR data is returned from MAX30102 (i.e. a finger is detected)
+
+    pinMode(LED_BUILTIN, OUTPUT); // The built -in LED switches when the temperature interrupt happens
+
+    pinMode(SENSOR_INTERRUPT, INPUT_PULLUP);
 
     Serial.begin(115200);
     delay(1000);
@@ -69,33 +75,44 @@ void setup() {
 
     Serial.println("Configuring MAX30102...");
     pulseSensor.setupSensor(); // set up max30102 driver
-    Serial.println("Configuration Successful!");
+    Serial.println("Config done.");
 
-    attachInterrupt(digitalPinToInterrupt(SENSOR_INTERRUPT), loadTemp, FALLING);
+    attachInterrupt(digitalPinToInterrupt(SENSOR_INTERRUPT), temp_interrupt, FALLING);
 
     // set up the LCD's number of columns and rows:
     lcd.begin(16, 2);
 
     lcd.print("Config done.");
 
-    
 }
 
 void loop() {
 
-
     // First check if it is time to turn off heartbeat diode
     long current_ms = micros();
 
+    // Check if heartbeat diode should be turned off
     if (current_ms - hb_tsp > hb_diode_dur) {
         digitalWrite(beat_led, LOW);
     }
 
-    // Check if it is temperature sampling time
+    // Check if it is time to order a temperature sample
     if (current_ms - last_temp_sample_us >= temp_sample_interval_us) {
         last_temp_sample_us = current_ms;
         pulseSensor.orderTemp();
-        Serial.println("temperature ordered");
+    }
+
+    // Check if temperature ready interrupt flag has been received
+    if (temp_flag) {
+
+        temp_flag = false;
+
+        int16_t localTemp;
+        pulseSensor.getTemp(localTemp);
+        sensor_data.temp = localTemp;
+
+        ledstate = !ledstate; // flip switch
+        digitalWrite(LED_BUILTIN, ledstate);
     }
 
     // Check if it is IR and RED sampling time
@@ -112,6 +129,8 @@ void loop() {
 
         // Check if the finger is on the sensor
         if (irAvg < pulseSensor.threshold)  {
+
+            // turn finger diode off if finger is not on the sensor
             digitalWrite(finger_led, LOW);
             
 
@@ -140,28 +159,21 @@ void loop() {
 
             float BPM = 6000.0 / t;
 
-
+            // Check if heartbeat is detected, Write to LCD if so
             if (hb) {
                 digitalWrite(beat_led, HIGH);
                 hb_tsp = current_ms; // record hearbeat time
-                
-                int16_t wholeDegree, milliDegrees;
-
-                temp_int_to_float(sensor_data.temp, wholeDegree, milliDegrees);
-
-                float tempurature = (float)wholeDegree + (float)milliDegrees / 1000.0;
-
-            
-                
+                            
+    
                 lcd.setCursor(0, 0);
                 lcd.print("BPM: ");
                 lcd.print(BPM,1 );
                 lcd.print("   ");
 
                 lcd.setCursor(0, 1);
-                lcd.print("Temp: ");
-                lcd.print(tempurature, 1);
-                lcd.print(" C  ");
+                lcd.print("SpO2: ");
+                lcd.print(SpO2, 1);
+                lcd.print(" %  ");
                 
 
             }
@@ -177,25 +189,14 @@ void loop() {
             Serial.print(" RED_DC:");
             Serial.print(RED_DC);
             Serial.println();
-            
-            Serial.print(" BPM:");
-            Serial.print(6000.0 / t);
-            Serial.print(" SpO2:");
-            Serial.print(SpO2);
-            Serial.println();*/
-            
-            
+            */
+        
 
         }
     }
 }
 
 // INterrupt function
-void loadTemp() {
-    // Load new temp into "sensor_data"
-    int16_t localTemp;
-    pulseSensor.getTemp(localTemp);
-    sensor_data.temp = localTemp;
-    //Serial.println(localTemp);
-    
+void temp_interrupt() {
+    temp_flag = true;
 }
