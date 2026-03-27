@@ -19,5 +19,5 @@ example.ino
 .vscode/
 
 # Circuit diagram files
-diagram/venv/
-diagram/spo2_circuit.svg
+diagram/
+kicad/
